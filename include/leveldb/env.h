@@ -90,9 +90,60 @@ private:
     // No copying allowed
     SequentialFile(const SequentialFile&);
     void operator=(const SequentialFile&);
-}   
+};  // class SequentialFile  
+
+class LEVELDB_EXPORT RandomAccessFile {
+public:
+    RandomAccessFile() { }
+    virtual ~RandomAccessFile();
+
+    // Read up to "n" bytes from the file starting at "offset".
+    // "scratch[0..n-1]" may be written by this routine. Sets "*result"
+    // to the data that was read (including if fewer than "n" bytes were
+    // successfully read). May set "*result" to point at data in
+    // "scratch[0..n-1]", so "scratch[0..n-1]" must be live when
+    // "*result" is used. If an error was encountered, returns a non-OK
+    // status.
+    //
+    // Safe for concurrent use by multiple threads.
+    virtual Status Read(uint64_t offset, size_t n, Slice* result,
+                        char* scratch) const = 0;
+
+private:
+    // No copying allowed
+    RandomAccessFile(const RandomAccessFile&);
+    void operator=(const RandomAccessFile&);
+};  // class RandomAccessFile
+
+// A file abstraction for sequential writing. The implementation
+// must provide buffering since callers may append small fragments
+// at a time to the file.
+class LEVEVDB_EXPORT WritableFile {
+public:
+    WritableFile() { }
+    virtual ~WritableFile();
+
+    virtual Status Append(const Slice&) = 0;
+    virtual Status Close() = 0;
+    virtual Status Flush() = 0;
+    virtual Status Sync() = 0;  // ** to-catch: difference between Flush() and Sync() ?
+
+private:
+    WritableFile(const WritableFile&);
+    void operator=(const WritableFile&);
+};
 
 
+// Identifies a locked file.
+class LEVELDB_EXPORT FileLock {
+public:
+    FileLock() {}
+    virtual ~FileLock();
+private:
+    // No copying allowed
+    FileLock(const FileLock&);
+    void operator=(const FileLock&);
+};
 
 
 }   // namespace leveldb

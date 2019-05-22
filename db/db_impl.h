@@ -58,10 +58,17 @@ private:
 
     Status NewDB();
 
+    // Recover the descriptor from the presistent storage. May do a significant
+    // amount of work to recover recently logged updates. Any changes to 
+    // be made to the descriptor are added to *edit.
+    Status Recover(VersionEdit* edit, bool* save_manifest)
+        EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+       
+
     // Constant after construction
     Env* const env_;
-    //
-    //
+    const InternalKeyComparator internal_comparator_;
+    const InternalFilterPolicy internal_filter_policy_;
     const Options options_; 
     bool owns_info_log_;
     bool owns_cache_;
@@ -69,6 +76,29 @@ private:
 
     // table_cache_ provides its own synchronization
     TableCache* table_cache_;
+
+    // Lock over the persistent DB state. Non-NULL iff successfully acquired.
+    FileLock* db_lock_;
+
+    // State below is protected by mutex_
+    port::Mutex mutex_;
+    port::AtomicPointer shutting_down_;     // **to-catch: why use this name??
+    port::CondVar bg_cv_;           // signaleled when background work finishes
+    MemTable* mem_;
+    MemTable* imm_;                 // Memtable being compacted
+    port::AtomicPointer has_imm_;   // So bg thread can detect non-NULL imm_
+    WritableFile* logfile_;
+    uint64_t logfile_number_;
+    log::Writer* log_;
+    uint32_t seed_;                 // For sampling.
+
+    // Queue of writers
+    std::deque<Writer*> writer_;
+    WriteBatch* tmp_batch_;
+
+    SnapshotList snapshots_;
+    
+
 
 }
 
