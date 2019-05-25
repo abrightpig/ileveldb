@@ -150,8 +150,14 @@ public:
             
         }
     }
-}
+};   // class PosixRandomAccessFile
 
+class PosixWritableFile : public WritableFile {
+private:
+
+public:
+
+};  // class PosixWritableFile
 
 class PosixEnv : public Env {
 public:
@@ -165,8 +171,24 @@ public:
     virtual Status NewSequentialFile(const std::string& fname,
                                     SequentialFile** result) {
         int fd = open(fname.c_str(), O_RDONLY); 
+        // ** to-add
     
     }
+
+    virtual Status NewWritableFile(const std::string& fname,
+                                   WritableFile** result) {
+        Status s;
+        int fd = open(fname.c_str(), O_TRUNC | O_WRONLY | O_CREAT, 0644);
+        if (fd < 0) {
+            *result = NULL;
+            s = PosixError(fname, errno);
+        }
+        else {
+            *result = new PosixWritableFile(fname, fd);
+        }
+        return s;
+    }
+
     
 
 };  // class PosixEnv 

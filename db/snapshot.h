@@ -39,6 +39,23 @@ public:
     SnapshotImpl* oldest() const { assert(!empty()); return list_.next_; }
     SnapshotImpl* newest() const { assert(!empty()); return list_.prev_; }
 
+    const SnapshotImpl* New(SequenceNumber seq) {
+        // ** to-catch
+        SnapshotImpl* s = new SnapshotImpl;
+        s->number_  = seq;
+        s->list_ = this;
+        s->next_ = &list_;
+        s->pre_  = list_.prev_;
+        s->prev_->next = s;
+        return s;
+    }
+
+    void Delete(const SnapshotImpl* s) {
+        // ** to-add
+    
+    }
+
+
 private:
     // Dummy head of doubly-linked list of snapshots
     SnapshotImpl list_;

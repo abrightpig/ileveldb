@@ -53,6 +53,16 @@ public:
                                     SequentialFile** result) = 0;
 
 
+    // Create an object that writes to a new file with the specified
+    // name. Deletes any existing file with the same nae and creates a
+    // new file. On success, stores a pointer to the new file in
+    // *result and returns OK. On failure stores NULL in *result and 
+    // return non-OK.
+    //
+    // The returned file will only be accessed by one thread at a time.
+    virtual Status NewWritableFile(const std::string& fname,
+                                    WritableFile** result) = 0;
+
 
 private:
     // No copying allowed

@@ -97,10 +97,54 @@ private:
     WriteBatch* tmp_batch_;
 
     SnapshotList snapshots_;
-    
 
+    // Set of table files to protect from deletion because they are
+    // part of ongoing compactions.
+    std::set<uint64_t> pending_outputs_;
 
-}
+    // Has a background compaction been scheduled or is running?
+    bool bg_compaction_scheduled_;
+
+    // Information for a manual compaction
+    struct ManualCompaction {
+        int level;
+        bool done;
+        const InternalKey* begin;   // NULL means beginning of key range
+        const InternalKey* end;     // NULL means end of key range
+        InternalKey tmp_storage;    // Used to keep track of compaction process
+    };
+    ManualCompaction* manual_compaction_;
+
+    VersionSet* versions_;
+
+    // Have we encountered a background error in the paranoid mode?
+    Status bg_error_;
+
+    // Per level compaction stats. stats_[level] stores the stats for 
+    // compactions that produced data for the specified "level".
+    struct CompactionStats {
+        int64_t micros;
+        int64_t bytes_read;
+        int64_t bytes_written;
+        
+        CompactionStats() : micros(0), bytes_read(0), bytes_written(0) { }
+
+        void Add(const CompactionStats& c) {
+            this->micros += c.micros;
+            this->bytes_read += c.bytes_read;
+            this->byte_written += c.bytes_written;
+        }
+    };
+    CompactionStats stats_[config::kNumLevels];
+
+    // No copying allowed
+    DBImpl(const DBImpl&);
+    void operator=(const DBImpl&);
+
+    const Comparator* user_comparator() const {
+        return internal_comparator_.user_comparator();
+    }
+};  // class DBImpl
 
 
 
