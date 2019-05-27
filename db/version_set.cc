@@ -30,12 +30,18 @@ VersionSet::VersionSet(const std::string& dbname,
         options_(options),
         table_cache_(table_cache),  // ** to-catch: what is relation between version_set and tablecache?
         icmp_(*cmp),
-        next_file_number_(2),
+        next_file_number_(2),       // ** to-catch: why init as 2, not 1 ?
         manifest_file_number_(0),   // Filled by Recover()
         last_sequence_(0),
         log_number_(0),
-        // ** to-add
+        // ** to-add 
+        { }
 
+int VersionSet::NumLevelFiles(int level) const {
+    assert(level >= 0);
+    assert(level < config::kNumLevels);
+    return current_->files_[level].size();
+}
 
 
 }   // namespace leveldb

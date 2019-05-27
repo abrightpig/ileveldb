@@ -75,14 +75,54 @@ public:
     // Allocate and return a new file number
     uint64_t NewFileNumber() { return next_file_number_++; }
 
+    // Arrange to reuse "file_number" unless a newer file number has
+    // already been allocated.
+    // REQUIRES: "file_number" was returned by a call to NewFileNumber().
+    void ReuseFileNumber(uint64_t file_number) {
+        if (next_file_number_ == file_number + 1) {
+            next_file_number = file_number;
+        }
+    }
+
+    // Return the number of Table files at the specified level.
+    int NumLevelFiles(int level) const;
+
+    // Return the last sequence number.
+    uint64_t LastSequence() const { return last_sequence_; }
+
+    // Set the last sequence number to s.
+    void SetLastSequence(uint64_t s) {
+        assert(s >= last_sequence);
+        last_sequence_ = s;
+    }
+
+    // Return the current log file number
+    uint64_t LogNumber() const { return log_number_; }
+
+    // Return the log file number for the log file that is currently
+    // being compacted, or zero if there is no such a log file.
+    uint64_t PreLogNumber() const { return prev_log_number_; }
+
 private:
     class Builder;
 
     friend class Compaction;
     friend class Version;
 
+    Env* const env_;
     uint64_t next_file_number_;     // ** to-catch: what file ?
+    uint64_t log_number_;
+    uint64_t last_sequence_;
+    uint64_t pre_log_number_;   // 0 or backing store for memtable being compacted
 
+
+
+    Version dummy_versions_;    // Head of circular doubly-linked list of versions.
+    Version* current_;          // == dummy_versions_.prev_
+
+    // No copying allowed
+    VersionSet(const VersionSet&);
+    void operator=(const VersionSet&)
 };  // class VersionSet
 
 // A compaction encapsulates information about a compaction.

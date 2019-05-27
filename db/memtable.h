@@ -36,11 +36,16 @@ public:
         }
     }
 
+    // Returns an estimate of the number of bytes of data in use by this
+    // data structure. It is safe to call when MemTable is being modified.
+    size_t ApproximateMemoryUsage();
+
 private:
     ~MemTable();    // Private since only Unref() should be used to delete it
 
 
     int refs_;
+    Arena arena_;
 
     // No Copying allowed
     MemTable(const MemTable&);

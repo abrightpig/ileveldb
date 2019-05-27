@@ -81,7 +81,7 @@ private:
     FileLock* db_lock_;
 
     // State below is protected by mutex_
-    port::Mutex mutex_;
+    port::Mutex mutex_;                     // ** to-catch: where does mutex_ come from?
     port::AtomicPointer shutting_down_;     // **to-catch: why use this name??
     port::CondVar bg_cv_;           // signaleled when background work finishes
     MemTable* mem_;

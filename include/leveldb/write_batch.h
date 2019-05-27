@@ -52,7 +52,12 @@ public:
     // Clear all updates buffered in this batch.
     void Clear();
 
-}
+private:
+    friend class WriteBatchInternal;
+
+    std::string rep_;   // See comment is write_batch
+    
+}; // class WriteBatch
 
 
 
