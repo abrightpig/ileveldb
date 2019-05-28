@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be 
 // found in the LICENSE file. See the AUTHRERS file for names of contributors.
 //
-// Thread-safe(provide internal synchronization)
-// ** to-catch : how to accomplish this?
+// Log format information shared by reader and writer.
+// See ../doc/log_format.md for more detail.
 
 #ifndef STORAGE_LEVELDB_DB_DB_LOG_FORMAT_H_
 #define STORAGE_LEVELDB_DB_DB_LOG_FORMAT_H_
@@ -24,10 +24,13 @@ enum RecordType {
 }
 static const int kMaxRecordType = kLastType;
 
-//** to-add
+static const int kBlockSize = 32768;        // 32k
 
+// Header is checksum (4 bytes), length (2 bytes), type(1 byte).
+static const kHeaderSize = 4 + 2 + 1;
 
-}
+}   // namespace log
+
 }   // namespace leveldb
 
 

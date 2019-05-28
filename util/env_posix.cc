@@ -30,6 +30,8 @@
 
 namespace leveldb {
 
+static const size_t kBufSize = 65536;
+
 static Status PosixError(const std::string& context, int err_number) {
     if (err_number == ENOENT) {
         return Status::NotFound(context, strerror(err_number)); 
@@ -154,8 +156,67 @@ public:
 
 class PosixWritableFile : public WritableFile {
 private:
+    // buf_[0, pos_-1] contains data to be written to fd_.
+    std::string filename_;
+    int fd_;
+    char buf_[kBufSize];
+    size_t pos_;
 
 public:
+    PosixWritableFile(const std::string& fname, int fd)
+        :   filename_(fname), fd_(fd), pos_(0) { }
+    
+    ~PosixWritableFile() {
+        if (fd_ >= 0) {
+            // Ignoring any potential errors
+            Close();
+        }
+    }
+
+    virtual Status Append(const Slice& data) {
+        size_t n = data.size();
+        const char* p = data.data();
+
+        // Fit as much as possible into buffer.
+        size_t copy = std::min(n, kBufSize - pos_);
+        memcpy(buf_ + pos_, p, copy);
+        p += copy;
+        n -= copy;
+        if (n == 0) {
+            return Status::OK();
+        }
+
+        // Can't fit in buffer, so need to do at least one write.
+        Status s = FlushBuffered();
+        if (!s.ok()) {
+            return s;
+        }
+
+        // Small writes go to buffer, large writes are written directly.
+        if (n < kBufSize) {
+            memcpy(buf_, p, n);
+            pos_ = n;
+            return Status::OK();
+        }
+        return WriteRaw(p, n);
+    }
+
+    virtual Status Close() {
+        Status result = FlushBuffered();
+        const int r = close(fd_);
+        if (r < 0 && result.ok()) {
+            result = PosixError(filename_, errno);
+        }
+        fd_ = -1;
+        return result;
+    }
+
+private:
+    Status FlashBuffered() {
+        Status s = WriteRaw(buf_, pos_);
+        pos_ = 0;
+        return s;
+    }
 
 };  // class PosixWritableFile
 
