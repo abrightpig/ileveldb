@@ -211,13 +211,75 @@ public:
         return result;
     }
 
+    virtual Status Flush() {
+        return FlushBuffered();
+    }
+
+    Status SyncDirIfManifest() {
+        const char* f = filename_.c_str();
+        const char* sep = strrchr(f, '/');
+        Slice basename;
+        std::string dir;
+        if (sep == NULL) {
+            dir = ".";
+            basename = f;
+        }
+        else {
+            dir = std::string(f, sep - f);
+            basename = sep + 1;
+        }
+        Status s;
+        if (basename.starts_with("MANIFEST")) {
+            if fd = open(dir.c_str(), O_RDONLY);
+            if (fd < 0) {
+                s = PosixError(dir, errno);
+            }
+            else {
+                if (fsync(fd) < 0) {
+                    s = PosixError(dir, errno);
+                }
+                close(fd);
+            }
+        }
+        return s;
+    }
+
+    virtual Status Sync() {
+        // Ensure new files referred to by the manifest are in the filesystem.
+        Status s = SyncDirManifest();
+        if (!s.ok()) {
+            return s;
+        }
+        s = FlushBuffered();
+        if (s.ok()) {
+            if (fdatasync(fd_) != 0) {
+                s = PosixError(filename_, errno);
+            }
+        }
+        return s;
+    }
+
 private:
-    Status FlashBuffered() {
+    Status FlushBuffered() {
         Status s = WriteRaw(buf_, pos_);
         pos_ = 0;
         return s;
     }
 
+    Status WriteRaw(const char* p, size_t n) {
+        while (n > 0) {
+            ssize_t r = write(fd_, p, n); 
+            if (r < 0) {
+                if (errno == EINTR) {
+                    continue;   // Retry
+                }
+                return PosixError(filename_, errno);
+            }
+            p += r;
+            n -= r;
+        }
+        return Status::OK();
+    }
 };  // class PosixWritableFile
 
 class PosixEnv : public Env {

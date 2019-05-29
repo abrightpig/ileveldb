@@ -138,7 +138,13 @@ Status DBImpl::Write(const WriteOptions & options, WriteBatch* my_batch) {
             status = log_->AddRecord(WriteBatchInternal::Contents(updates));
             bool sync_error = false;
             if (status.ok() && options.sync) {
-            
+                status = logfile_->Sync(); 
+                if (!status.ok()) {
+                    sync_error = true;
+                }
+            }
+            if (status.ok()) {
+                status = WriteBatchInternal::InsertInto(updates, mem_);
             }
         
         

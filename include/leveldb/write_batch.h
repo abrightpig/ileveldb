@@ -47,7 +47,15 @@ public:
     //
     // This number is tied to implementation details, and may change across
     // release. It is intended for LevelDB usage metrics.
-    /
+
+    // Support for iterating over the contents of a batch.
+    class Handler {
+    public:
+        virtual ~Handler();
+        virtual void Put(const Slice& key, const Slice& value) = 0;
+        virtual void Delete(const Slice& key) = 0;
+    };
+    Status Iterate(Handler* handler) const;
 
     // Clear all updates buffered in this batch.
     void Clear();
