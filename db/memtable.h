@@ -40,6 +40,13 @@ public:
     // data structure. It is safe to call when MemTable is being modified.
     size_t ApproximateMemoryUsage();
 
+    // Add an entry into memtable that maps key to value at the 
+    // specified sequence number and with the specified type.
+    // Typically value will be empty if type==kTypeDeletion.
+    void Add(SequenceNumber seq, ValueType type,
+            const Slice& key,
+            const Slice& value);
+
 private:
     ~MemTable();    // Private since only Unref() should be used to delete it
 
