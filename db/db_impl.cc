@@ -98,6 +98,15 @@ DBImpl::DBImpl(const Options& raw_options, const std::string dbname)
                                 &internal_comparator_);
 }    
 
+
+void DBImpl::RecordBackgroundError(const Status& s) {
+    mutext_.AssertHeld();
+    if (bg_error_.ok()) {
+        bg_error_ = s;
+        bg_cv_.SignalAll();
+    }
+}
+
 // Convenience methods
 // ** to-catch: why DB::Put() is called here?
 Status DBImpl::Put(const WriteOptions& o, const Slice& key, const Slice& value) {
@@ -146,19 +155,37 @@ Status DBImpl::Write(const WriteOptions & options, WriteBatch* my_batch) {
             if (status.ok()) {
                 status = WriteBatchInternal::InsertInto(updates, mem_);
             }
-        
-        
+            mutex_.Lock(); 
+            if (sync_error) {
+                // The state of the log file is indeterminate: the log record we
+                // just added may or may not show up when the DB is re-opened.
+                // So we force the DB into a mode where all future writes fail.
+                // ** to-catch
+                RecordBackgroundError(status);
+            }
         }
+        if (updates == tmp_batch_) tmp_batch_->Clear();     // **to-catch
 
+        versions_->SetLastSequence(last_sequence);
     }
 
+    while (true) {
+        Writer* ready = writers_.front();
+        writers_.pop_front();
+        if (ready != &w) {              //other threads' write request    
+            ready->status = status;
+            ready->done = true;
+            ready->cv.Signal();
+        }
+        if (ready == last_writer) break; 
+    }
 
+    // Notify new head of write queue
+    if (!writers_.empty()) {
+        writers_.front()->cv.Signal();
+    }
 
-
-
-
-
-
+    return status;
 }
 
 // REQUIRES: Writer list must be non-empty
