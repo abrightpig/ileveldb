@@ -107,6 +107,53 @@ void DBImpl::RecordBackgroundError(const Status& s) {
     }
 }
 
+Status DBImpl::Get(const ReadOptions& options,
+                   const Slice& key,
+                   std::string* value) {
+    Status s;
+    MutexLock l(&mutex_);
+    SequenceNumber snapshot;
+    if (options.snapshot != NULL) {
+        snapshot = reinterpret_cast<const SnapshotImpl*>(options.snapshot)->number_;
+    }
+    else {
+        snapshot = version_->LastSequence();
+    }
+
+    MemTable* mem = mem_;
+    MemTable* imm = imm_;
+    Version* current = versions_->current();    // **to-catch
+    mem->Ref();
+    if (imm != NULL) imm->Ref();
+    current->Ref();
+
+    bool have_stat_update = false;
+    Version::GetStats stats;
+
+    // Unlock while reading from files and memtables  ** to-catch: why, how?
+    {
+        mutex_.Unlock();
+        // First look in the memtable, then in the immutable memtable(if any).
+        LookUpKey lkey(key, snapshot);
+        if (mem->Get(lkey, value, &s)) {
+            // Done
+        }
+        else if (imm != NULL && imm->Get(lkey, value, &s)) {
+            // Done
+        } 
+        else {
+            s = current->Get(options, lkey, value, &stats);
+            have_stat_update = true;
+        }
+        mutex_.Lock();
+    }
+
+
+
+}
+
+
+
 // Convenience methods
 // ** to-catch: why DB::Put() is called here?
 Status DBImpl::Put(const WriteOptions& o, const Slice& key, const Slice& value) {

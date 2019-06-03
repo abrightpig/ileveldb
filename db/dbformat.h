@@ -109,7 +109,7 @@ public:
 // incorrectly use string comparisions instead of an InternalKeyComparator.
 class InternalKey {
 private:
-    std::string rep_;   // ** to-catch: why called rep_?
+    std::string rep_;   
 public: 
     InternalKey() { }   // Leave rep_ as empty to indicate it is invalid
     InternalKey(const Slice& user_key, SequenceNumber s, ValueType t) {
@@ -117,9 +117,45 @@ public:
     }
 
 
+};  // class InternalKey
+
+
+
+// A helper class useful for DBImpl::Get()
+class LookupKey {
+public:
+    // Initialize *this for looking up user_key at a snapshot with
+    // the specified sequence number.
+    LookupKey(const Slice& user_key, SequenceNumber sequence);
+
+    ~LookupKey();
+
+    // Return a key suitable for lookup in a MemTable.
+    Slice memtable_key() const { }
+
+
+
+private:
+    // We construction a char array of the form:
+    //  klength varint32            <-- start_
+    //  userkey char[klength]       <-- kstart_
+    //  tag     uint64              
+    //                              <-- end_
+    //  The array is a suitable MemTable key. 
+    //  The suffix starting with "userkey" can be used as an InternalKey.
+    const char* start_;
+    const char* kstart_;
+    const char* end_;
+    char space_[200];           // Avoid allocation for short keys
+
+    // No copying allowed
+    LookupKey(const LookupKey&);
+    void operator=(const LookupKey&);
+};  // class LookupKey
+
+inline LookupKey::~LookupKey() {
+
 }
-
-
 
 
 }   // namespace leveldb

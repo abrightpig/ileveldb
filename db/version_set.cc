@@ -43,5 +43,8 @@ int VersionSet::NumLevelFiles(int level) const {
     return current_->files_[level].size();
 }
 
+void Version::Ref() {
+    ++refs_;
+}
 
 }   // namespace leveldb

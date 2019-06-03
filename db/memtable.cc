@@ -12,8 +12,21 @@
 namespace leveldb {
 
 
+MemTable::MemTable(const InternalKeyComparator& cmp)
+    :   comparator_(cmp),
+        refs_(0),
+        table_(comparator_, &arena_) {
+}
+
+MemTable::~MemTable() {
+    assert(refs_ == 0);
+}
 
 size_t MemTable::ApproximateMemoryUsage() { return arena_.MemoryUsage(); }
+
+
+
+
 
 
 void MemTable::Add(SequenceNumber s, ValueType type,
@@ -40,6 +53,17 @@ void MemTable::Add(SequenceNumber s, ValueType type,
     memcpy(p, value.data(), val_size);
     assert((p + val_size) - buf == encoded_len);
     table_.Insert(buf);
+}
+
+void MemTable::Get(const LookupKey& key, std::string* value, Status* s) {
+    Slice memkey = key.memtable_key();
+    // ** to-catch: where is memkey parsed?
+    Table::Iterator iter(&table);
+    iter.Seek(memkey.data());
+    if (iter.Valid()) {
+    
+    }
+    return false;
 }
 
 }   // namespace leveldb

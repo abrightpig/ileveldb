@@ -55,6 +55,9 @@ public:
                 GetStats* stats);
 
 
+    // Reference count management(so Versions do not disappear out from 
+    // under live iterators)
+    void Ref();
 
 privte:
     friend class Compaction;
@@ -62,6 +65,19 @@ privte:
 
     class LevelFileNumIterator;
 
+
+    VersionSet* vset_;          // VersionSet to which this Version belongs
+    Version* next_;             // Next version in linked list
+    Version* prev_;             // Previous version in linked list
+    int refs_;                  // Number of 
+
+
+
+    ~Version();
+
+    // No copying allowed
+    Version(const Version&);
+    void operator=(const Version&);
 };   // class Version
 
 class VersionSet {

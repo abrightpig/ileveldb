@@ -1,3 +1,6 @@
+// Copyright 2011 The LevelDB Authers.All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be 
+// found in the LICENSE file. See the AUTHRERS file for names of contributors.
 //
 // Slice is a simple structure containing a pointer into some external
 // storage and a size. The user of a Slice must ensure that the slice
@@ -100,8 +103,5 @@ inline int Slice::compare(const Slice& b) const {
     }
     return r;
 }
-
-
-
 
 #endif  // STORAGE_LEVELDB_INCLUDE_SLICE_H_

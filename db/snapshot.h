@@ -12,7 +12,7 @@ namespace leveldb {
     
 class SnapshotList;
 
-// Snapshots are keyt in doubly-linked list in the DB.
+// Snapshots are kept in doubly-linked list in the DB.
 // Each SnapshotImpl corresponds to a particular sequence number.
 class SnapshotImpl : public Snapshot {
 public:

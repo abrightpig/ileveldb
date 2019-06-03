@@ -162,6 +162,33 @@ struct LEVELDB_EXPORT Options {
     Options();
 };  // struct Options
 
+// Options that control read operations
+struct LEVELDB_EXPORT ReadOptions {
+    // If true, all data read from underlying storage will be
+    // verified against corresponding checksum.
+    // Default: false
+    // ** to-catch: when & where open this flag?
+    bool verify_checksums;
+
+    // Should the data read for this iteration be cached in memory?
+    // Callers may wish to set this filed to false for bulk scans.
+    // Default: true.
+    bool fill_cache;
+
+    // If "snapshot" is non-NULL, read as of the supplied snapshot
+    // (which must belong to the DB that is being read and which must
+    // not have been released). If "snapshot" is NULL, use a imlicit
+    // snapshot of the state at the beginning of this read operation.
+    // Default: NULL
+    const Snapshot* snapshot;
+
+    ReadOptions()
+        :   verify_checksums(false),
+            fill_cache(true),
+            snapshot(NULL) {
+    }
+};  // struct ReadOptions
+
 // Options that control write operations
 struct LEVELDB_EXPORT WriteOptions {
     // If true, the write will be flushed from the operating system
