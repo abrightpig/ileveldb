@@ -131,9 +131,13 @@ public:
     ~LookupKey();
 
     // Return a key suitable for lookup in a MemTable.
-    Slice memtable_key() const { }
+    Slice memtable_key() const { return Slice(start_, end_ - start_); }
 
+    // Return an internal key (suitable for passing to an internal iterator)
+    Slice internal_key const () { return Slice(kstart_, end_ - kstart_); }
 
+    // Return the user key
+    Slice user_key() const { return Slice(kstart_, end_ - kstart_ - 8); }
 
 private:
     // We construction a char array of the form:

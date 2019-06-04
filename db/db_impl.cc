@@ -122,7 +122,7 @@ Status DBImpl::Get(const ReadOptions& options,
 
     MemTable* mem = mem_;
     MemTable* imm = imm_;
-    Version* current = versions_->current();    // **to-catch
+    Version* current = versions_->current();   
     mem->Ref();
     if (imm != NULL) imm->Ref();
     current->Ref();

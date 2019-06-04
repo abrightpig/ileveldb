@@ -25,6 +25,16 @@ std::string LogFileName(const std::string& name, uint64_t number) {
     return MakeFileName(name, number, "log");
 }
 
+std::string TableFileName(const std::string& name, uint64_t number) {
+    assert(number > 0);
+    return MakeFileName(name, number, "ldb");
+}
+
+std::string SSTTableName(const std::string& name, uint64_t number) {
+    assert(number > 0);
+    return MakeFileName(name, number, "sst");
+}
+
 
 }   // namespace leveldb
 

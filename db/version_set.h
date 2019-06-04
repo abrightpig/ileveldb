@@ -71,6 +71,8 @@ privte:
     Version* prev_;             // Previous version in linked list
     int refs_;                  // Number of 
 
+    // List of files per level
+    std::vector<FileMetaData*> files_[config::kNumLevels];
 
 
     ~Version();
@@ -126,9 +128,11 @@ private:
     friend class Version;
 
     Env* const env_;
+    TableCache* const table_cache_;
+    const InternalKeyComparator icmp_;
     uint64_t next_file_number_;     // ** to-catch: what file ?
-    uint64_t log_number_;
     uint64_t last_sequence_;
+    uint64_t log_number_;
     uint64_t pre_log_number_;   // 0 or backing store for memtable being compacted
 
 
