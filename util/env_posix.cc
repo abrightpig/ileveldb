@@ -30,6 +30,11 @@
 
 namespace leveldb {
 
+namespace {
+
+static int open_read_only_file_limit = -1;
+static int mmap_limit = -1;
+
 static const size_t kBufSize = 65536;
 
 static Status PosixError(const std::string& context, int err_number) {
@@ -132,15 +137,15 @@ public:
 class PosixRandomAccessFile: public RandomAccessFile {
 private:
     std::string filename_;
-    bool temporary_fd_;     // If true, fd_ is -1 and we open on every read.
+    bool temporary_fd_;   // If true, fd_ is -1 and we open on every read.
     int fd_;
     Limiter* limiter_;
 
 public:
     PosixRandomAccessFile(const std::string& fname, int fd, Limiter* limiter)
         : filename_(fname), fd_(fd), limiter_(limiter) {
-        temporary_fd_ = !limiter->Acquire();    // ** to-catch: what is done here??
-        if (temporary_fd_) {
+        temporary_fd_ = !limiter->Acquire();   
+        if (temporary_fd_) {    
             // Open file on every access.
             close(fd_);
             fd = -1;
@@ -149,10 +154,72 @@ public:
 
     virtual ~PosixRandomAccessFile() {
         if (!temporary_fd_) {
-            
+            close(fd_);
+            limiter_->Release();
         }
     }
+
+    virtual Status Read(uint64_t offset, size_t n, Slice* result,
+                        char* scratch) const {
+        int fd = fd_;
+        if (temporary_fd_) {
+            fd = open(filename_.c_str(), O_RDONLY);
+            if (fd < 0) {
+                return PosixError(filename_, errno);
+            }
+        }
+
+        Status s;
+        ssize_t r = pread(fd, scratch, n static_cast<off_t>(offset));
+        *result = Slice(scratch, (r < 0) ? 0 : r);
+        if (r < 0) {
+            // An error: return a non-ok status
+            s = PosixError(filename_, errno);
+        }
+        if (temporary_fd_) {
+            // Close the temporary file descriptor opened earlier.
+            close(fd);
+        } 
+        return s;
+    }
 };   // class PosixRandomAccessFile
+
+// mmap() based random-access
+class PosixMmapReadableFile: public RandomAccessFile {
+private:
+    std::string filename_;
+    void* mmapped_region_;
+    size_t length_;
+    Limiter* limiter_;
+    
+public:
+    // base[0,length-1] contains the mmapped contents of the file.
+    PosixMmapReadableFile(const std::string& fname, void* base, size_t length,
+            limiter* limiter)
+        :   filename_(fname, void* base, length_(length)
+            limiter_(limiter) {
+    }
+
+    virtual ~PosixMmapReadableFile() {
+        munmap(mmapped_region_, length_);
+        limiter_->Release();
+    }
+
+    virtual Status Read(uint64_t offset, size_t n, Slice* result,
+                        char* scratch) const {
+        Status s;
+        if (offset + n > length_) {
+            *result = Slice();
+            s = PosixError(filename_, EINVAL);
+        }
+        else {
+            *result = Slice(reinterpret_cast<char*>(mmapped_region_) + offset, n);
+        }
+        return s;
+    }
+
+
+}
 
 class PosixWritableFile : public WritableFile {
 private:
@@ -295,7 +362,39 @@ public:
                                     SequentialFile** result) {
         int fd = open(fname.c_str(), O_RDONLY); 
         // ** to-add
+        // ***********************
     
+    }
+
+    virtual Status NewRandomAccessFile(const std::string& fname,
+                                       RandomAccess** result) {
+        *result = NULL;
+        Status s;
+        int fd = open(fname.c_str(), O_RDONLY);
+        if (fd < 0) {
+            s = PosixError(fname, errno);
+        }
+        else if (mmap_limit_.Accquire()) {
+            uint64_t size;
+            s = GetFileSize(fname, &size);
+            if (s.ok()) {
+                void* base = mmap(NULL, size, PROT_READ, MAP_SHARED, fd, 0);
+                if (base != MAP_FAILED) {
+                    *result = new PosixMmapReadableFile(fname, base, size, &mmap_limit_);
+                }
+                else {
+                    s = PosixError(fname, errno);
+                } 
+            }
+            close(fd);
+            if (!s.ok()) {
+                mmap_limit_.Release(); 
+            }
+        }
+        else {
+            *result = new PosixRandomAccessFile(fname, fd, &fd_limit_);
+        }
+        return s; 
     }
 
     virtual Status NewWritableFile(const std::string& fname,
@@ -312,9 +411,75 @@ public:
         return s;
     }
 
-    
+    virtual Status GetFileSize(const std::string& fname, uint64_t* size) {
+        Status s;
+        struct stat sbuf;
+        if (stat(fname.c_str(), &sbuf != 0)) {
+            *size = 0;
+            s = PosixError(fname, errno);
+        }
+        else {
+            *size = sbuf.st_size;
+        }
+        return s;
+    }
 
+private:
+    void PthreadCall(const char* label, int result) {
+        if (result != 0) {
+            fprintf(stderr, "pthread %s: %s\n", label, strerror(result));
+            abort();
+        } 
+    }
+    pthread_mutex_t mu_;
+    pthread_cont_t bgsignal_;
+    pthread_t bgthread_;
+
+    Limiter mmap_limit_; 
+    Limiter fd_limit_;
 };  // class PosixEnv 
+
+// Return the maximum number of concurrent mmaps.
+static int MaxMaps() {
+    if (mmap_limit >= 0) {
+        return mmap_limit;
+    }
+    // Up to 1000 mmaps for 64-bit binaries; none for smaller pointer sizes.
+    // ** to-catch?  why 0 for smaller pointer size ??
+    mmap_limit = sizeof(void*) >= 8 ? 1000 : 0;
+    return mmap_limit;
+}
+
+// Return the maximum number of read-only files to keep open.
+static intptr_t MaxOpenFiles() {
+    if (open_read_only_file_limit >= 0) {
+        return open_read_only_file_limit;
+    }
+    struct rlimit rlim;
+    if (getrlimit(RLIMIT_NOFILE, &rlim)) {
+        // getrlimit failed, fallback to hard-coded default.
+        open_read_only_file_limit = 50;    
+    }
+    else if (rlim.rlim_cur == RLIM_INFINITY) {
+        open_read_only_file_limit = std::numeric_limits<int>::max();
+    }
+    else {
+        // Allow use of 20% of avaliable file descripters for read-only files.
+        open_read_only_file_limit = rlim.rlim_cur / 5;
+    }
+    return open_read_only_limit;
+}
+
+PosixEnv::PosixEnv()
+    :   started_bgthread_(false),
+        mmap_limit_(MaxMmaps()),
+        fd_limit_(MaxOpenFiles()) {
+    PthreadCall("mutex_init", pthread_mutex_init(&mu_, NULL));
+    PthreadCall("cvar_init", pthread_cond_init(&bgsignal_, NULL));
+}
+
+
+}   // namespace
 
 
 static pthread_once_t once = PTHREAD_ONCE_INIT;
