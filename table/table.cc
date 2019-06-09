@@ -47,6 +47,14 @@ Status Table::Open(const Options& options,
         s = ReadBlock(file, opt, footer.index_handle(), &index_block_contents);
     }
 
+    if (s.ok()) {
+        // We've successfully read the footer and the index block: we're
+        // ready to serve requests.
+        Block* index_block = new Block(index_block_contents);
+    }
+
+    
+
 }
 
 

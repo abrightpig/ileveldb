@@ -80,14 +80,26 @@ private:
 // and taking the leading 64 bits.
 static const uint64_t kTableMagicNumber = 0xdb4775248b80fb57ull; 
 
+// 1-byte type + 32-bit crc
+static const size_t kBlockTrailerSize = 5;
 
 struct BlockContents {
     Slice data;             // Actual contents of data
     bool cachable;          // True iff data can be cached
     bool heap_allocated;    // True iff caller should delete[] data.data()
-
 };
 
+// Read the block identified by "handle" from "file". On failure
+// return non-OK. On success fill *result and return OK.
+extern Status ReadBlock(RandomAccessFile* file,
+                        const ReadOptions& options,
+                        const BlockHandle& handle,
+                        BlockContent* result);
+
+inline BlockHandle::BlockHandle()
+    :   offset_(~static_cast<uint64_t>(0)),
+        size_(~static_cast<uint64_t>(0)) {        
+}
 
 }   // namespace leveldb
 
