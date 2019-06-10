@@ -424,6 +424,9 @@ public:
         return s;
     }
 
+    virtual void Schedule(void (*function)(void*), void* arg);
+
+
 private:
     void PthreadCall(const char* label, int result) {
         if (result != 0) {
@@ -431,9 +434,23 @@ private:
             abort();
         } 
     }
+
+    // BGThread is the body of the background thread
+    void BGThread();
+    static void* BGThreadWrpper(void* arg) {
+        reinterpret_cast<PosixEnv*>(arg)->BGThread();
+        return NULL;
+    }
+
     pthread_mutex_t mu_;
     pthread_cont_t bgsignal_;
     pthread_t bgthread_;
+    bool started_bgthread_;
+
+    // Entry per Schedule() call
+    struct BGItem { void* arg; void (*function)(void*); }
+    typedef std::deque<BGItem> BGQueue;
+    BGQueue queue_;
 
     Limiter mmap_limit_; 
     Limiter fd_limit_;
@@ -478,6 +495,46 @@ PosixEnv::PosixEnv()
     PthreadCall("cvar_init", pthread_cond_init(&bgsignal_, NULL));
 }
 
+void PosixEnv::Schedule(void (*function)(void*), void* arg) {
+    PthreadCall("lock", pthread_mutex_lock(&mu_));
+
+    if (!started_bgthread_) {
+        started_bgthread_ = true;
+        PthreadCall(
+                "create thread",
+                pthread_create(&bgthread_, NULL, &PosixEnv::BGThreadWarpper, this));
+    }
+
+    // If the queue is currently empty, the background thread may currently be
+    // waiting.
+    if (queue_.empty()) {
+        PthreadCall("signal", pthread_cond_signal(&bgsignal_));
+    }
+
+    // Add to priority queue
+    queue_.push_back(BGItem());
+    queue_.back().function = function;
+    queue_.back().arg = arg;
+
+    PthreadCall("unlock", pthread_mutex_unlock(&mu_));
+}
+
+void PosixEnv::BGThread() {
+    while (true) {
+        // Wait until there is an item that is ready to run
+        PthreadCall("lock", pthread_mutex_lock(&mu_));
+        while (queue_empty()) {
+            PthreadCall("wait", pthread_cond_wait(&bgsignal_, &mu_));
+        }
+
+        void (*function)(void*) = queue_.front().function;
+        void *arg = queue_.front().arg;
+        queue_.pop_front();
+
+        PthreadCall("unlock", pthread_mutex_unlock(&mu_));
+        (*function)(arg);
+    }
+}
 
 }   // namespace
 

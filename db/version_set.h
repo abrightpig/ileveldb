@@ -74,6 +74,11 @@ privte:
     // List of files per level
     std::vector<FileMetaData*> files_[config::kNumLevels];
 
+    // Level that should be compacted next and its compaction score.
+    // Score < 1 means compaction is not strictly needed. These fields
+    // are initialized by Finalize().
+    double compaction_score_;
+    int compaction_level_;
 
     ~Version();
 
@@ -121,11 +126,26 @@ public:
     // being compacted, or zero if there is no such a log file.
     uint64_t PreLogNumber() const { return prev_log_number_; }
 
+
+
+    // Returns true iff some level needs a compaction.
+    bool NeedsCompaction() const {
+        Version* v = current_;
+        return (v->compaction_score_ >= 1) || (v->file_to_compcact != NULL);
+    }
+
+
+
 private:
     class Builder;
 
     friend class Compaction;
     friend class Version;
+
+
+    void Finalize(Version* v);
+
+
 
     Env* const env_;
     TableCache* const table_cache_;

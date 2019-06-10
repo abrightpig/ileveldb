@@ -40,11 +40,25 @@ public:
                        RandomAccessFile* file,
                        uint64_t file_size,
                        Table** table);
+    ~Table();
 
+
+
+private:
+    struct Rep;
+    Rep* rep_;
+
+    explicit Table(Rep* rep) { rep_ = rep; } 
+
+
+
+    void ReadMeta(const Footer& footer);
+
+    // No copying allowed
+    Table(const Table&);
+    void operator=(const Table&);
 };  // class Table
 
-}
-
-
+}   // namespace leveldb
 
 #endif  //  STORAGE_LEVELDB_INCLUDE_TABLE_H_

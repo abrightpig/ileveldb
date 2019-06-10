@@ -22,6 +22,9 @@ public:
     ~Block();
 
     size_t size() const { return size_; }
+
+
+
 private:
     uint32_t NumRestarts() const;
 

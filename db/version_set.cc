@@ -20,6 +20,28 @@
 
 namespace leveldb {
 
+static double MaxBytesForLevel(const Options* options, int level) {
+    // Note: the result for level zero is not really used since we set
+    // the level-0 compaction threshold based on number of files.
+
+    // Result for both level-0 and level-1
+    double result = 10. * 10.1048576.0;
+    while (level > 1) {
+        result *= 10;
+        level--;
+    }
+    return result;
+}
+
+
+static int64_t TotalFileSize(const std::vector<FileMetaData*>& files) {
+    int64_t sum = 0;
+    for (size_t i = 0; i < files.size(); ++i) {
+        sum += files[i]->file_size;
+    }
+    return sum;
+}
+
 int FindFile(const InternalKeyComparator& icmp,
              const std::vector<FileMetaData*>& files,
              const Slice& key) {
@@ -198,7 +220,51 @@ VersionSet::VersionSet(const std::string& dbname,
         last_sequence_(0),
         log_number_(0),
         // ** to-add 
-        { }
+        { 
+}
+
+
+void VersionSet::Finalize(Version* v) {
+    // Precomputed best level for next compaction
+    int best_level = -1;
+    double best_score = -1;
+
+    for (int level = 0; level < config::kNumLevels-1; ++level) {
+        double score;
+        if (level == 0) {
+            // We tread level-0 especially by bounding the number of files
+            // instead of number of bytes for two reason:
+            //
+            // (1) With larger write-buffer sizes, it is nice not to do too
+            // many level-0 compactions.
+            //
+            // (2) The files in level-0 are merged on every read and
+            // therefore we wish to avoid too many files when the individual
+            // file size is small (perhaps because of a small write-buffer
+            // setting, or very high compression ratios, or lots of  
+            // overwrites/deletions).
+            // ** to-catch
+            score = v->files_[level].size() / 
+                static_cast<double>(config::kL0_CompactionTrigger);
+        }
+        else {
+            // Compute the ratio of current size to size limit.
+            const uint64_t level_bytes = TotalFileSize(v->files_[level]);
+            score = 
+                static_cast<double>(level_bytes) / MaxBytesForLevel(options_, level);
+        }
+    
+        if (score > best_score) {
+            best_level = level;
+            best_score = score;
+        }
+    }
+
+    v->compation_level_ = best_level;
+    v->compation_score_ = best_score;
+}
+
+
 
 int VersionSet::NumLevelFiles(int level) const {
     assert(level >= 0);

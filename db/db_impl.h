@@ -65,6 +65,17 @@ private:
         EXCLUSIVE_LOCKS_REQUIRED(mutex_);
        
 
+    
+    void MaybeScheduleCompaction() EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+    static void BGWork(void* db);
+    void BackgroundCall();
+    void BackgroundCompaction() EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+    void CleanupCompaction(CompactionState* compact)
+        EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+    Status DoCompactionWork(CompactionState* compact)
+        EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+
+
     // Constant after construction
     Env* const env_;
     const InternalKeyComparator internal_comparator_;
@@ -82,7 +93,7 @@ private:
 
     // State below is protected by mutex_
     port::Mutex mutex_;                     // ** to-catch: where does mutex_ come from?
-    port::AtomicPointer shutting_down_;     // **to-catch: why use this name??
+    port::AtomicPointer shutting_down_;     
     port::CondVar bg_cv_;           // signaleled when background work finishes
     MemTable* mem_;
     MemTable* imm_;                 // Memtable being compacted

@@ -99,12 +99,91 @@ DBImpl::DBImpl(const Options& raw_options, const std::string dbname)
 }    
 
 
+void CompactMemTable() {
+    mutex_.AssertHeld();
+    assert(imm_ != NULL);
+
+    // Save the contents of the memtable as a new Table
+    VersionEdit edit;
+    Version* base = versions_->current();
+    base->Ref();
+    Status s = WriteLevel0Table(imm_, &edit, base);
+    base->Unref();
+
+    if (s.ok() && shutting_down_.Acquire_Load()) {
+        s = Status::IOError("Deleting DB during memtable compaction");
+    }
+
+    // Replace immutable memtable with the generated Table
+    if (s.ok()) {
+        edit.SetPrevLogNumver(0);
+    }
+}
+
+
 void DBImpl::RecordBackgroundError(const Status& s) {
     mutext_.AssertHeld();
     if (bg_error_.ok()) {
         bg_error_ = s;
         bg_cv_.SignalAll();
     }
+}
+
+void DBImpl::MaybeScheduleCompaction() {
+    mutex_.AssertHeld();
+    if (bg_compaction_scheduled_) {
+        // Already scheduled
+    }
+    else if (shutting_down_.Acquire_Load()) {
+        // DB is being deleted; no more background compactions
+    }
+    else if (!bg_error_.ok()) {
+        // Already got an error; no more changes
+    }
+    else if (imm_ == NULL && 
+             manual_compaction_ == NULL &&
+             !versions_->NeedsCompation()) {
+        // No work to be done
+    }
+    else {
+        bg_compaction_scheduled_ = true;
+        env_->Schedule(&DBImpl::BGWork, this);
+    }
+}
+
+void DBImpl::BGWork(void* db) {
+    reinterpret_cast<DBImpl*>(db)->BackgroundCall();
+}
+
+void DBImpl::BackgroundCall() {
+    MutexLock l(&mutex_);
+    assert(bg_compaction_scheduled_);
+    if (shutting_down_.Acquire_Load()) {
+        // No more background work when shutting down.
+    }
+    else if (!bg_error_.ok()) {
+        // No more background work after a background error.
+    }
+    else {
+        BackgroundCompaction();
+    }
+
+    bg_compaction_scheduled_ = false;
+
+    // Previous compaction may have produced too many files in a level,
+    // so reschedule another compaction if needed.
+    MaybeScheduleCompaction();
+    bg_cv_.SignalAll();
+}
+
+void DBImpl::BackgroundCompaction() {
+    mutex_.AssertHeld();
+
+    if (imm_ != NULL) {
+        CompactMemTable();
+        return;
+    }
+
 }
 
 Status DBImpl::Get(const ReadOptions& options,

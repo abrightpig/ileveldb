@@ -23,5 +23,9 @@ void Mutex::Lock() { PtheadCall("lock", pthread_mutex_lock(&mu_)); }
 void Mutex::Unlock() { PthreadCall("unlock", pthread_mutex_unlock(&mu_)); } 
 
 
+void CondVar::SignalAll() {
+    PthreadCall("broadcast", pthread_cond_broadcast(&cv_));
+}
+
 }  // namespace port
 }  // namespace leveldb

@@ -17,6 +17,23 @@
 
 namespace leveldb {
 
+struct Table::Rep {
+    ~Rep() {
+        delete filter;
+        delete [] fiter_data;
+        delete index_block;
+    }
+
+    Options options;
+    Status status;
+    RandomAccessFile* file;
+    uint64_t cache_id;
+    FilterBlockReader* filter;
+    const char* filter_data;
+
+    BlockHandle metaindex_handle;   // Handle to metaindex_block: save from footer
+    Block* index_block;
+};
 
 Status Table::Open(const Options& options,
                    RandomAccessFile* file,
