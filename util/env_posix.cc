@@ -426,6 +426,13 @@ public:
 
     virtual void Schedule(void (*function)(void*), void* arg);
 
+    
+    virtual uint64_t NowMicros() {
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        return static_cast<uint64_t>(tv.tv_sec) * 1000000 + tv.tv_usec;
+    }
+
 
 private:
     void PthreadCall(const char* label, int result) {

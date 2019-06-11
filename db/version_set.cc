@@ -20,6 +20,17 @@
 
 namespace leveldb {
 
+static int TargetFileSize(const Options* options) {
+    return options_->max_file_size;
+}    
+
+// Maximum bytes of overlaps in grandparent (i.e., level+2) before we 
+// stop building a single file in a level->level+1 compaction.
+static int64_t MaxGrandParentOverlapBytes(const Options* options) {
+    return 10 * TargetFileSize(options);
+}
+
+
 static double MaxBytesForLevel(const Options* options, int level) {
     // Note: the result for level zero is not really used since we set
     // the level-0 compaction threshold based on number of files.
@@ -63,6 +74,62 @@ int FindFile(const InternalKeyComparator& icmp,
     }
     return right;
 }
+
+
+
+static bool AfterFile(const Comparator* ucmp,
+                      const Slice* user_key, const FileMetaData* f) {
+    // NULL user_key occurs before all keys and is therefore never after *f
+    return (user_key != NULL && 
+            ucmp->Compare(*user_key, f->largest.user_key()) > 0);
+
+}
+
+static bool BeforeFile(const Comparator* ucmp,
+                       const Slice* user_key, const FileMetaData* f) {
+    // NULL user_key occurs after all keys and is therefore never before *f
+    return (user_key != NULL &&
+            ucmp->Compare(*user_key, f->smallest.user_key()) < 0);
+}
+
+bool SomeFileOverlapsRange(
+    const InternalKeyComparator& icmp,
+    bool disjoint_sorted_files,
+    const std::vector<FileMetaData*>& files,
+    const Slice* smallest_user_key,
+    const Slice* largest_user_key) {
+    if (!disjoint_sorted_files) {
+        // Need to check against all files
+        for (size_t i = 0; i < files.size(); i++) {
+            const FileMetaData* f = files[i];
+            if (AfterFile(ucmp, smallest_user_key, f) || 
+                BeforeFile(ucmp, largest_user_key, f)) {
+                // No overlap
+            }
+            else {
+                return true;    // Overlap
+            }
+        }
+        return false;
+    }
+
+    // Binary search over file list
+    uint32_t index = 0;
+    if (smallest_user_key != NULL) {
+        // Find the earliest possible internal key for smallest_user_key
+        InternalKey small(*smallest_user_key, kMaxSequenceNumber, kValueTypeForSeek);
+        index = FindFile(icmp, files, small.Encode());
+    }
+    
+    if (index >= file.size()) {
+        // beginning of range is after all files, so no overlap
+        return false;
+    }
+
+    return !Before(ucmp, largest_user_key, files[index]);
+}
+
+
 
 // Callback from TableCache::Get()
 namespace {
@@ -205,6 +272,69 @@ Status Version::Get(const ReadOptions& options,
 void Version::Ref() {
     ++refs_;
 }
+
+void Version::~UnRef() {
+    assert(this != &vset_->dummy_version_);
+    assert(refs_ >= 1);
+    --refs_;
+    if (refs_ == 0) {
+        delete this;
+    }
+}
+
+
+bool Version::OverlapInLevel(int level,
+                             const Slice* smallest_user_key,
+                             const Slice* largest_user_key) {
+    return SomeFileOverlapsRange(vset_->icmp_, (level > 0), files_[level],
+                                 smallest_user_key, largest_user_key);
+
+}
+
+int Version::PickLevelForMemTableOutput(
+    const Slice& smallest_user_key,
+    const Slice& largest_user_key) {
+    int level = 0;
+    // ** to-catch: why overlap is needed here? 
+    if (!OverlapInLevel(0, &smallest_user_key, &largest_user_key)) {
+        // Push to next level if there is no overlap in next level,
+        // and the #bytes overlapping in the level after that are limited.
+        // ** to-catch
+        InternalKey start(smallest_user_key, kMaxSequenceMumber, kValueTypeForSeek);
+        InternalKey limit(largest_use_key, 0, static_cast<ValueType>(0));
+        std::vector<FileMetaData*> overlaps;
+        while (level < config::kMaxMemCompactLevel) {
+            if (OverlapInLevel(level + 1, &smallest_user_key, &largest_user_key)) {
+                break;
+            } 
+            if (level + 2 < config::kNumLevels) {
+                // Check that file does not overlap too many grandparent bytes.
+                GetOverlappingInput(level + 2, &start, &limit, &overlaps);
+                const int64_t sum = TotalFileSize(overlaps);
+                if (sum > MaxGrandParentOverlapBytes(vset_->options_)) {
+                    break;
+                }
+            }
+            level++;
+        }
+    }
+    return level;
+}
+
+// Store in "*input" all files in "level" that overlap [begin, end]
+void Version::GetOverlappingInputs(
+    int level,
+    const InternalKey* begin,
+    const InternalKey* end,
+    std::vector<FileMetaData*>* inputs) {
+    //****************************
+    //****************************
+    //****************************
+    //****************************
+
+
+}
+
 
 VersionSet::VersionSet(const std::string& dbname,
                        const Option* options,

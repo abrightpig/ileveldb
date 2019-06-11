@@ -37,11 +37,27 @@ public:
         has_log_number_ = true;
         log_number_ = num;
     }
+    void SetPrevLogNumber(uint64_t num) {
+        has_prev_log_number_ = true;
+        prev_log_number_ = num;
+    }
 
 private:
-   friend class VersionSet;
+    friend class VersionSet;
+
+    typedef std::set< std::pair<int, uint64_t> > DeletedFileSet;
+
+    uint64_t log_number_;
+    uint64_t prev_log_number_;
+    uint64_t next_file_number_;
+
+    bool has_log_number_;
+    bool has_prev_log_number_;
 
 
+    //std::vector< std::pair<int, InternalKey> > compact_pointers_;
+    DeletedFileSet deleted_files_;
+    std::vector< std::pair<int, FileMetaData> > new_files_;
 };  // class VersionEdit
 
 }   // namespace leveldb

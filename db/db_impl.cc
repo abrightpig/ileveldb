@@ -98,6 +98,44 @@ DBImpl::DBImpl(const Options& raw_options, const std::string dbname)
                                 &internal_comparator_);
 }    
 
+Status DBImp::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
+                               Version* base) {
+    mutex_.AssertHeld();
+    const uint64_t start_micros = env_->NowMicros();
+    FileMetaData meta;
+    meta.number = version_->NewFileNumber();
+    pending_output_.insert(meta.number);
+    Iterator* iter = mem->NewIterator();
+    Log(options_.info_log, "Level-0 table #%llu%: started",
+        (unsigned long long) meta.number);
+
+    Status s;
+    {
+        mutex_.Unlock();
+        s = BuildTable(dbname_, env_, options_, table_cache_, iter, &meta);
+        mutex_.Lock();
+    }
+
+    Log(options_.info_log, "Level-0 table #%llu: %lld bytes %s",
+        (unsigned long long) meta.number,
+        (unsigned long long) meta.file_size,
+        s.ToString().c_str());
+    delete iter;
+    pending_outputs_.erase(meta.number);
+
+    // Note that if file_size is zero, the file has been deleted and
+    // should not be added to the manifest.
+    int level = 0;
+    if (s.ok() && meta.file_size > 0) {
+        const Slice min_user_key = meta.smallest.user_key();
+        const Slice max_user_key = meta.largest.user_key();
+        if (base != NULL) {
+            level = base->PickLevelForMemTableOutput(min_user_key, max_user_key);
+        }
+        edit->AddFile(level, meta.number, meta.file_size,
+                      meta.smallest, meta.largest);
+    }
+}
 
 void CompactMemTable() {
     mutex_.AssertHeld();
@@ -116,7 +154,20 @@ void CompactMemTable() {
 
     // Replace immutable memtable with the generated Table
     if (s.ok()) {
-        edit.SetPrevLogNumver(0);
+        edit.SetPrevLogNumver(0);       // **to-catch
+        edit.SetLogNumber(log_file_number_);     // Earlier logs no longer needed
+        s = versions_->LogAndApply(&edit, &mutex_);
+    }
+
+    if (s.ok()) {
+        // Commit to the new state
+        imm_->Unref();
+        imm_ = NULL;
+        has_imm_.Release_Store(NULL);
+        DeleteObsoleteFiles();
+    }
+    else {
+        RecordBackgroundError(s); 
     }
 }
 

@@ -64,6 +64,28 @@ public:
                                     WritableFile** result) = 0;
 
 
+    
+    // Store the size of fname in *file_size.
+    virtual Status GetFileSize(const std::string& fname, uint64_t* file_size) = 0;
+
+
+
+    // Arrange to run "(*function)(arg)" once in a background thread.
+    //
+    // "function" may run in an unspecified thread. Multiple functions
+    // added to the same Env may run concurrently in different threads.
+    // I.e., the caller may not assume that background work items are
+    // serialized.
+    virtual void Schedule(
+            void (*function)(void* arg),
+            void* arg) = 0;
+
+
+
+    // Returns the number of micro-seconds since some fixed point in time. Only
+    // useful for computing deltas of time.
+    virtual uint64_t NowMicros() = 0;
+
 private:
     // No copying allowed
     Env(const Env&);

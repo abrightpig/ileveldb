@@ -26,6 +26,17 @@ public:
     //  > 0 iff "a" > "b"
     virtual int Compare(const Slice& a, const Slice& b) = 0;
 
+
+    // Advanced functions: these are used to reduce the space requirements
+    // for internal data structures like index blocks.
+    //
+    // If *start < limit, change *start to a short string in [start,limit).
+    // Simple comparator implementations may return with *start unchanged,
+    // i.e., an implementation of this method that does nothing is correct.
+    virtual void FindShortestSeperator(
+            std::string *start,
+            const Slice& limit) = 0;
+
 };  // class Comparator
 
 // Return a builtin comparator that uses lexicographic byte-wise
