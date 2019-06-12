@@ -37,6 +37,10 @@ public:
             std::string *start,
             const Slice& limit) = 0;
 
+    // Change *key to a short string >= *key.
+    // Simple comparator implementations may return with *key unchanged,
+    // i.e., an implementation of this method that does nothing is correct.
+    virtual void FindShortSuccessor(std::string* key) const = 0;
 };  // class Comparator
 
 // Return a builtin comparator that uses lexicographic byte-wise

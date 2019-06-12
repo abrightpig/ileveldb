@@ -11,6 +11,10 @@
 
 namespace leveldb {
 
+struct TableAndFile {
+    RandomAccessFile* file;
+    Table* table;
+};
 
 TableCache::TableCache(const std::string& dbname,
                        const Options* options,
@@ -61,6 +65,30 @@ Status TableCache::FindTable(uint64_t file_number, uint64_t file_size,
         }
     }
     return s;
+}
+
+Iterator* TableCache::NewIterator(const ReadOptions& options,
+                                  uint64_t file_number,
+                                  uint64_t file_size,
+                                  Table** tableptr) {
+    if (tableptr != NULL) {
+        *tableptr = NULL;
+    }
+
+    Cache::Handle* handle = NULL;
+    Status s = FindTable(file_number, file_size, &handle);
+    if (!s.ok()) {
+        return NewErrorIterator();
+    }
+
+    Table* table = reinterpret_cast<TableAndFile*>(cache_->Value(handle))->table;
+    Iterator* result = table->NewIterator(options);
+    result->RegisterCleanup(&UnrefEntry, cache_, handle);
+    //**************************
+    //**************************
+    //**************************
+   
+
 }
 
 Status TableCache::Get(const ReadOptions& options,

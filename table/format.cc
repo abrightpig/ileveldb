@@ -12,6 +12,14 @@
 
 namespace leveldb {
 
+void BlockHandle::EncodeTo(std::string* dst) {
+    // Sanity check that all fields have been set
+    assert(offset_ != ~static_cast<uint64_t>(0));
+    assert(size_ != ~static_cast<uint64_t>(0));
+    PutVarint64(dst, offset_);
+    PutVarint64(dst, size_);
+}
+
 Status BlockHandle::DecodeFrom(Slice* input) {
     if (GetVarint64(input, &offset_) && 
         GetVarint64(input, &size_)) {
@@ -20,6 +28,17 @@ Status BlockHandle::DecodeFrom(Slice* input) {
     else {
         return Status::Corruption("bad block handle"); 
     }
+}
+
+void Footer::EncodeTo(std::string* dst) {
+    const size_t original_size = dst->size();
+    metaindex_handle_.EncodeTo(des);
+    index_handle_.EncodeTo(dst);
+    dst->resize(2 * BlockHandle::kMaxEncodedLength);    // Padding
+    PutFixed32(dst, static_cast<uint32_t>(kTableMagicNumber & 0xffffffffu))
+    PutFixed32(dst, static_cast<uint32_t>(kTableMagicNumber >> 32));
+    assert(dst->size() == original_size + kEncodedLength);
+    (void)origial_size; // Disable unused variable warning.
 }
 
 Status Footer::DecodeFrom(Slice* input) {

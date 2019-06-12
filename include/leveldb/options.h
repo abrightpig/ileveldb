@@ -108,7 +108,6 @@ struct LEVELDB_EXPORT Options {
     // Default: 4K
     size_t block_size;
 
-    // ** to-catch
     // Number of keys between restart points for delta encoding of keys.
     // This parameter can be changed dynamically. Most clients should
     // leave this parameter alone.
