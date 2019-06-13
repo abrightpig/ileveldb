@@ -185,9 +185,20 @@ Status TableBuilder::Finish() {
     }
 
     // Write metaindex block
-    //***********************
-    //***********************
-    //***********************
+    if (ok()) {
+        BlockBuilder meta_index_block(&r->options); 
+        if (r->filter_block != NULL) {
+            // Add mapping from "filter.Name" to location of filter data
+            std::string key = "filter.";
+            key.append(r->options.filter_policy->Name());
+            std::string handle_encoding;
+            filter_block_handle.EncodeTo(&handle_encoding);
+            meta_index_block_.Add(key, handle_encoding);
+        }
+
+        // TODO(postrelease): Add stats and other meta blocks
+        WriteBlock(&meta_index_block, &metaindex_block_handle);
+    }
 
     // Write index block
     if (ok()) {

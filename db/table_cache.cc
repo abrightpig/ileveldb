@@ -84,9 +84,6 @@ Iterator* TableCache::NewIterator(const ReadOptions& options,
     Table* table = reinterpret_cast<TableAndFile*>(cache_->Value(handle))->table;
     Iterator* result = table->NewIterator(options);
     result->RegisterCleanup(&UnrefEntry, cache_, handle);
-    //**************************
-    //**************************
-    //**************************
    
 
 }
