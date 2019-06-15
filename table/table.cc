@@ -69,11 +69,27 @@ Status Table::Open(const Options& options,
         // ready to serve requests.
         Block* index_block = new Block(index_block_contents);
     }
+    //***********************************
+    //***********************************
+    //***********************************
+    //***********************************
+}
 
-    
+// Convert an index iterator value (i.e., an encoded BlockHandle)
+// into an iterator over the contents of the corresponding block.
+Iterator* Table::BlockReader(void* arg,
+                             const ReadOptions& options,
+                             const Slice& index_value) {
+    Table* table = reinterpret_cast<Table*>(arg);
+    Cache* block_cache = table->rep_->options.block_cache;
 
 }
 
+Iterator* Table::NewIterator() const {
+    return NewTwoLevelIterator(
+            rep_->index_block->NewIterator(rep_->options.comparator),
+            &Table::BlockReader, const_cast<Table*>(this), options);
+}
 
 
 }   // namespace leveldb
