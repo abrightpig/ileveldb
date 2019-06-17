@@ -45,6 +45,19 @@ private:
 
 };  // class FilterBlockBuilder
 
+class FilterBlockReader {
+public:
+    // REQUIRES: "contents" and *policy must stay live while *this is live.
+    FilterBlockReader(const FilterePolicy* policy, const Slice& contents);
+    bool KeyMayMatch(uint64_t block_offset, const Slice& key);
+
+private:
+    const FilterPolicy* policy_;
+    const char* data_;      // Pointer to filter data (at block-start)
+    const char* offset_;    // Pointer to beginning of offset array (at block-end)
+    size_t num_;            // Number of entries of offset array
+    size_t base_lg_;        // Encoding parameter (see kFilterBaseLg in .cc file) 
+};  // class FilterBlockReader
 
 }   // namespace leveldb
 

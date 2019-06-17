@@ -16,6 +16,19 @@ struct TableAndFile {
     Table* table;
 };
 
+static void DeleteEntry(const Slice& key, void* value) {
+    TableAndFile* tf = reinterpret_cast<TableAndFile*>(value);
+    delete tf->table;
+    delete tf->file;
+    delete tf;
+}
+
+static void UnrefEntry(void* arg1, void* arg2) {
+    Cache* cache = reinterpret_cast<Cache*>(arg1);
+    Cache::Handle* h = reinterpret_cast<Cache::Handle*>(arg2)
+    cache->Release(h);
+}
+
 TableCache::TableCache(const std::string& dbname,
                        const Options* options,
                        int entries)
@@ -78,16 +91,16 @@ Iterator* TableCache::NewIterator(const ReadOptions& options,
     Cache::Handle* handle = NULL;
     Status s = FindTable(file_number, file_size, &handle);
     if (!s.ok()) {
-        return NewErrorIterator();
+        return NewErrorIterator(s);
     }
 
     Table* table = reinterpret_cast<TableAndFile*>(cache_->Value(handle))->table;
     Iterator* result = table->NewIterator(options);
     result->RegisterCleanup(&UnrefEntry, cache_, handle);
-    //****************8
-    //****************8
-   
-
+    if (tableptr != NULL) {
+        *tableptr = table;
+    }
+    return result;
 }
 
 Status TableCache::Get(const ReadOptions& options,

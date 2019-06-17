@@ -57,11 +57,21 @@ options SanitizeOptions(const std::string& dbname,
                         const InternalKeyComparator* icmp,
                         const InternalFilterPolicy* ipolicy,
                         const Options& src) {
-    // ** to-add
     Options result = src;
-    //
-    //
-    //
+    //****************************
+    //****************************
+    //****************************
+    //****************************
+    //****************************
+    //****************************
+    //****************************
+    //****************************
+    //****************************
+
+    if (result.block_cache == NULL) {
+       result.block_cache == NewLRUCache(8 << 20); 
+    }
+
     return result;
 }
 

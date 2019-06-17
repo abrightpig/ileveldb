@@ -75,3 +75,19 @@ void FilterBlockBuilder::GenerateFilter() {
     keys_clear();
     start_.clear();
 }
+
+FilterBlockReader::FilterBlockReader(const FillterPolicy* policy,
+                                     const Slice& contents)
+    : policy_(policy),
+      data_(NULL),
+      offset_(NULL),
+      num_(0),
+      base_lg_(0) {
+    size_t n = contents.size();
+    if (n < 5) return; // 1 byte for base_lg_ and 4 for start of offset array
+    base_lg_ = contents[n-1];
+    uint32_t last_word = DecodeFixed32(contents.data() + n - 5);
+    //********************************
+}
+
+}   // namespace leveldb
