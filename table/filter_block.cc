@@ -87,7 +87,28 @@ FilterBlockReader::FilterBlockReader(const FillterPolicy* policy,
     if (n < 5) return; // 1 byte for base_lg_ and 4 for start of offset array
     base_lg_ = contents[n-1];
     uint32_t last_word = DecodeFixed32(contents.data() + n - 5);
-    //********************************
+    if (last_word > n - 5) return;
+    data_ = contents.data();
+    offset_ = data_ + last_word;
+    num_ = (n - 5 - last_word) / 4;
 }
+
+bool FilterBlockReader::KeyMayMatch(uint64_t block_offset, const Slice& key) {
+    uint64_t index = block_offset >> base_lg_;
+    if (index < num_) {
+        uint32_t start = DecodeFixed32(offset_ + index * 4);
+        uint32_t limit = DecodeFixed32(offset_ + index * 4 + 4);
+        if (start <= limit && limit <= static_cast<size_t>(offset_ - data_)) {
+            Slice filter = Slice(data_ + start, limit - start);
+            return policy_->KeyMayMatch(key, filter);
+        }
+        else if (start == limit) {
+            // Empty filters do not match any keys
+            return false;
+        }
+    }
+    return true;    // Errors are treated as potential matches
+}
+
 
 }   // namespace leveldb

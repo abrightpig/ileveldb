@@ -82,6 +82,4 @@ Status BuildTable(const std::string& dbname,
     return s;
 }
 
-
-
 }   // namespace leveldb

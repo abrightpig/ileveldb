@@ -145,6 +145,9 @@ Status DBImp::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
         edit->AddFile(level, meta.number, meta.file_size,
                       meta.smallest, meta.largest);
     }
+    //*********************************
+    //*********************************
+    //*********************************
 }
 
 void CompactMemTable() {

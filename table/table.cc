@@ -217,5 +217,37 @@ Iterator* Table::NewIterator(const ReadOptions& options) const {
             &Table::BlockReader, const_cast<Table*>(this), options);
 }
 
+Status Table::IternalGet(const ReadOptions& options, const Slice& k,
+                         void* arg,
+                         void* (*saver)(void*, const Slice&, const Slice&)) {
+    Status s;
+    Iterator* iiter = rep_->index_block->NewIterator(rep_->options.comparator);
+    iiter->Seek(k);
+    if (iiter->Valid()) {
+        Slice handle_value = iiter->value();
+        FilterBlockReader* filter = rep_->filter;
+        BlockHandle handle;
+        if (filter != NULL &&
+            handle.DecodeFrom(&handle_value).ok() &&
+            !filter->KeyMayMatch(handle.offset(), k)) {
+            // Not found 
+        }
+        else {
+            Iterator* block_iter = BlockReader(this, options, iiter->value());
+            block_iter->Seek(k);
+            if (block_iter->Valid()) {
+                (*saver)(arg, block_iter->key(), block_iter->value());
+            }
+            s = block_iter->status();
+            delete block_iter;
+        }
+    }
+    if (s.ok()) {
+        s = iiter->status();
+    }
+    delete iiter;
+    return s;
+}
+
 
 }   // namespace leveldb
